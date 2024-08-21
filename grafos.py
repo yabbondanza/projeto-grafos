@@ -302,6 +302,29 @@ def kruskal(grafo):
     peso_total = sum(w for u, v, w in result)
     return peso_total
 
+def ordenacao_topologica(grafo):
+    graus_entrada = {nó: 0 for nó in grafo}
+    for nó in grafo:
+        for vizinho in grafo[nó]:
+            graus_entrada[vizinho] = graus_entrada.get(vizinho, 0) + 1
+
+    grau_zero = sorted([nó for nó in graus_entrada if graus_entrada[nó] == 0])
+
+    ordem_topologica = []
+    while grau_zero:
+        nó = grau_zero.pop(0)
+        ordem_topologica.append(nó)
+        for vizinho in sorted(grafo.get(nó, {})):
+            graus_entrada[vizinho] -= 1
+            if graus_entrada[vizinho] == 0:
+                grau_zero.append(vizinho)
+                grau_zero = sorted(grau_zero)
+
+    if len(ordem_topologica) == len(graus_entrada):
+        return ordem_topologica
+    else:
+        return -1 # qdo tem ciclo
+
 
 def main():
     propriedades_desejadas = list(map(int, input().split()))
@@ -362,6 +385,13 @@ def main():
                 resultados[propriedade] = kruskal(grafo)
             else:
                 resultados[propriedade] = -1
+        elif propriedade == 11:  # calcular o valor final da MST para grafos não direcionados
+            if tipo_grafo == 'nao_direcionado':
+                resultados[propriedade] = -1
+            else:
+                resultados[propriedade] = ordenacao_topologica(grafo)
+        else:
+            resultados[propriedade] = -1
 
     for propriedade in propriedades_desejadas:
         print(resultados[propriedade])
