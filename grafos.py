@@ -6,6 +6,44 @@ Yasmim Danzieri Abbondanza Laurentino
 
 import heapq
 from collections import deque
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
+# função para criar e visualizar o grafo
+def visualizar_grafo(grafo, tipo_grafo):
+    G = nx.DiGraph() if tipo_grafo == 'direcionado' else nx.Graph()
+
+    for u in grafo:
+        for v, peso, id_aresta in grafo[u]:
+            G.add_edge(u, v, weight=peso, label=id_aresta)
+
+    nro_vertices = len(G.nodes)
+
+    if nro_vertices <= 10:
+        k = 1.2
+        tamanhoFigura = (4, 5)
+    elif nro_vertices <= 20:
+        k = 0.8
+        tamanhoFigura = (6, 8)
+    else:
+        k = 0.5
+        tamanhoFigura = (8, 10)
+
+
+    pos = nx.spring_layout(G,k=k)
+
+    # Desenho do grafo
+    plt.figure(figsize=tamanhoFigura)
+    nx.draw(G, pos, with_labels=True, node_color='cyan', font_weight='bold', node_size=500, font_size=10)
+
+    # Desenho das arestas com pesos
+    edge_labels = nx.get_edge_attributes(G, 'weight')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+
+    plt.title(f"Grafo {tipo_grafo}")
+    plt.show()
+
 
 # leitura da entrada para montagem do grafo
 def ler_grafo():
@@ -434,6 +472,8 @@ def caminho_minimo(grafo, num_vertices):
 def main():
     propriedades_desejadas = list(map(int, input().split()))
     grafo, tipo_grafo, num_vertices = ler_grafo()
+
+    visualizar_grafo(grafo, tipo_grafo)
 
     resultados = {}  # para armazenar os resultados e imprimir na ordem correta
 
