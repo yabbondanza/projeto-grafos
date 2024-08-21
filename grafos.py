@@ -1,40 +1,80 @@
-# montagem do grafo com a entrada
+'''
+Código desenvolvido por:
+Gabriel Camargos Alves
+Yasmim Danzieri Abbondanza Laurentino
+'''
+
+import heapq
+from collections import deque
+
+# leitura da entrada para montagem do grafo
 def ler_grafo():
     num_vertices, num_arestas = map(int, input().split())
-    tipo_grafo = input()
+    tipo_grafo = input().strip()
     grafo = {}
 
     for _ in range(num_arestas):
         id_aresta, u, v, peso = map(int, input().split())
         if tipo_grafo == 'nao_direcionado':
-            grafo.setdefault(u, {}).update({v: id_aresta})
-            grafo.setdefault(v, {}).update({u: id_aresta})
+            grafo.setdefault(u, []).append((v, peso, id_aresta))
+            grafo.setdefault(v, []).append((u, peso, id_aresta))
         else:
-            grafo.setdefault(u, {}).update({v: id_aresta})
+            grafo.setdefault(u, []).append((v, peso, id_aresta))
 
     return grafo, tipo_grafo, num_vertices
 
-# validação se o grafo é conexo
-def eh_conexo(grafo):
-    visitados = set()
+# função auxiliar
+def possui_pesos_diferentes(grafo):
+    pesos = set()
+    for u in grafo:
+        for v, peso, _ in grafo[u]:
+            pesos.add(peso)
+            if len(pesos) > 1:
+                return True
+    return False
 
-    def dfs(vertice):
-        visitados.add(vertice)
-        for vizinho in grafo.get(vertice, set()):
-            if vizinho not in visitados:
+# função auxiliar
+def find(pai, i):
+    if pai[i] == i:
+        return i
+    return find(pai, pai[i])
+
+# função auxiliar
+def union(pai, rank, x, y):
+    raiz_x = find(pai, x)
+    yroot = find(pai, y)
+
+    if rank[raiz_x] < rank[yroot]:
+        pai[raiz_x] = yroot
+    elif rank[raiz_x] > rank[yroot]:
+        pai[yroot] = raiz_x
+    else:
+        pai[yroot] = raiz_x
+        rank[raiz_x] += 1
+
+# validação se o grafo é conexo
+def conexo(grafo, num_vertices):
+    visitado = set()
+
+    def dfs(v):
+        visitado.add(v)
+        for vizinho, _, _ in grafo.get(v, []):
+            if vizinho not in visitado:
                 dfs(vizinho)
 
-    dfs(next(iter(grafo)))
+    inicio = next(iter(grafo))
+    dfs(inicio)
+    
+    return len(visitado) == num_vertices
 
-    return len(visitados) == len(grafo)
 
 # validação se o grafo é bipartido
-def eh_bipartido(grafo):
+def bipartido(grafo):
     cores = {}
-
+    
     def dfs(vertice, cor):
         cores[vertice] = cor
-        for vizinho in grafo.get(vertice, set()):
+        for vizinho, _, _ in grafo.get(vertice, []):
             if vizinho not in cores:
                 if not dfs(vizinho, 1 - cor):
                     return False
@@ -49,9 +89,10 @@ def eh_bipartido(grafo):
 
     return True
 
+
 # validação se o grafo é euleriano
-def eh_euleriano(grafo):
-    if not eh_conexo(grafo):
+def euleriano(grafo, num_vertices):
+    if not conexo(grafo, num_vertices):
         return False
 
     graus_impares = sum(1 for vertice in grafo if len(grafo[vertice]) % 2 == 1)
@@ -65,7 +106,7 @@ def possui_ciclo_nao_direcionado(grafo):
 
     def dfs(vertice, pai):
         visitados.add(vertice)
-        for vizinho in grafo.get(vertice, set()):
+        for vizinho, _, _ in grafo.get(vertice, []):
             if vizinho not in visitados:
                 parent[vizinho] = vertice
                 if dfs(vizinho, vertice):
@@ -88,7 +129,7 @@ def possui_ciclo_direcionado(grafo, num_vertices):
 
     def dfs(vertice):
         cores[vertice] = cinza
-        for vizinho in grafo.get(vertice, set()):
+        for vizinho, _, _ in grafo.get(vertice, []):
             if cores[vizinho] == cinza:
                 return True
             if cores[vizinho] == branco and dfs(vizinho):
@@ -96,142 +137,149 @@ def possui_ciclo_direcionado(grafo, num_vertices):
         cores[vertice] = preto
         return False
 
-    for vertice in grafo:
+    for vertice in range(num_vertices):
         if cores[vertice] == branco:
             if dfs(vertice):
                 return True
-
     return False
 
-# calculo da qtd de componentes conexas
+# calculo da quantidade de componentes conexas no grafo
 def num_componentes_conexas(grafo):
     visitados = set()
     num_componentes = 0
+    vertices = set(grafo.keys())
 
     def dfs(vertice):
         visitados.add(vertice)
-        for vizinho in grafo.get(vertice, set()):
+        for vizinho, _, _ in grafo.get(vertice, []):
             if vizinho not in visitados:
                 dfs(vizinho)
 
-    for vertice in grafo:
+    for vertice in vertices:
         if vertice not in visitados:
             dfs(vertice)
             num_componentes += 1
 
-    return num_componentes if num_componentes > 0 else -1
+    for vertice in range(max(vertices) + 1):
+        if vertice not in vertices:
+            num_componentes += 1
 
-# calcula numero de componentes fortemente conexas em grafo direcionado usando tarjan
+    return num_componentes
+
+
+# calculo do numero de componentes fortemente conexas em grafo direcionado usando tarjan
 def componentes_fortemente_conexas(grafo):
-    max_vertex_id = max(grafo.keys()) 
-    n = max_vertex_id + 1 
-    index = 0
-    indices = [-1] * n
-    baixos = [-1] * n
-    na_pilha = [False] * n
+    indice = 0
     pilha = []
-    componentes = []
+    indices = {}
+    baixos = {}
+    num_componentes = 0
 
     def tarjan(v):
-        nonlocal index
-        indices[v] = index
-        baixos[v] = index
-        index += 1
+        nonlocal indice, num_componentes
+        indices[v] = baixos[v] = indice
+        indice += 1
         pilha.append(v)
-        na_pilha[v] = True
-
-        for vizinho in grafo.get(v, set()):
-            if indices[vizinho] == -1:
+        
+        for vizinho, _, _ in grafo.get(v, []):
+            if vizinho not in indices:
                 tarjan(vizinho)
                 baixos[v] = min(baixos[v], baixos[vizinho])
-            elif na_pilha[vizinho]:
+            elif vizinho in pilha:
                 baixos[v] = min(baixos[v], indices[vizinho])
-
+        
         if baixos[v] == indices[v]:
-            componente = []
+            num_componentes += 1
             while True:
                 w = pilha.pop()
-                na_pilha[w] = False
-                componente.append(w)
                 if w == v:
                     break
-            componentes.append(componente)
 
-    for v in range(n):
-        if indices[v] == -1:
+    for v in range(len(grafo)):
+        if v not in indices:
             tarjan(v)
 
-    return len(componentes)
+    return num_componentes
 
 # encontra os vertices de articulaçao em grafo nao direcionado
 def vertices_de_articulacao(grafo):
-    n = len(grafo)
-    visitado = [False] * n
-    descoberta = [-1] * n
-    baixo = [-1] * n
-    pai = [-1] * n
-    tempo = 0
+    visitado = {}
+    descoberta = {}
+    baixo = {}
+    pai = {}
+    tempo = [0]
     articulacoes = []
 
     def dfs(u):
-        nonlocal tempo
         filhos = 0
         visitado[u] = True
-        descoberta[u] = baixo[u] = tempo
-        tempo += 1
+        descoberta[u] = baixo[u] = tempo[0]
+        tempo[0] += 1
 
-        for v in grafo.get(u, []):
-            if not visitado[v]:
+        for v, _, _ in grafo.get(u, []):
+            if v not in visitado:
                 pai[v] = u
                 filhos += 1
                 dfs(v)
                 baixo[u] = min(baixo[u], baixo[v])
 
-                if (pai[u] == -1 and filhos > 1) or (pai[u] != -1 and baixo[v] >= descoberta[u]):
+                if (pai.get(u) is None and filhos > 1) or (pai.get(u) is not None and baixo[v] >= descoberta[u]):
                     articulacoes.append(u)
-            elif v != pai[u]:
+            elif v != pai.get(u):
                 baixo[u] = min(baixo[u], descoberta[v])
 
-    for i in grafo: 
-        if not visitado[i]:
+    for i in grafo:
+        if i not in visitado:
             dfs(i)
 
     return sorted(articulacoes)
 
 # encontra as arestas ponte em grafo nao direcionado
 def arestas_ponte(grafo):
-    n = len(grafo)
-    visitado = [False] * n
-    descoberta = [-1] * n
-    baixo = [-1] * n
-    pai = [-1] * n
-    tempo = 0
+    visitado = set()
+    descoberta = {}
+    baixo = {}
+    pai = {}
     pontes = []
-
+    tempo = [0]
     def dfs(u):
-        nonlocal tempo
-        filhos = 0
-        visitado[u] = True
-        descoberta[u] = baixo[u] = tempo
-        tempo += 1
+        visitado.add(u)
+        descoberta[u] = baixo[u] = tempo[0]
+        tempo[0] += 1
 
-        for v in grafo.get(u, []):
-            if not visitado[v]:
+        for v, _, _ in grafo.get(u, []):
+            if v not in descoberta:
                 pai[v] = u
-                filhos += 1
                 dfs(v)
                 baixo[u] = min(baixo[u], baixo[v])
 
                 if baixo[v] > descoberta[u]:
                     pontes.append((u, v))
-            elif v != pai[u]:
+            elif v != pai.get(u):
                 baixo[u] = min(baixo[u], descoberta[v])
 
     for i in grafo:
-        if not visitado[i]:
+        if i not in descoberta:
             dfs(i)
 
-    return pontes
+    return sorted(pontes)
+
+# realiza a busca em profundidade e retorna a árvore com os identificadores das arestas
+def dfs_tree(grafo, origem=0):
+    visitados = set()
+    arvore = []
+    
+    def dfs(vertice, id_aresta_pai=None):
+        visitados.add(vertice)
+        if id_aresta_pai is not None:
+            arvore.append(id_aresta_pai)
+
+        for vizinho, _, id_aresta in grafo.get(vertice, []):
+            if vizinho not in visitados:
+                dfs(vizinho, id_aresta)
+
+    dfs(origem)
+    return arvore
 
 # verifica a arvore de largura e imprime o identificador das arestas
 def bfs(grafo, origem=0):
@@ -243,69 +291,50 @@ def bfs(grafo, origem=0):
         vertice = fila.pop(0)
         visitados.add(vertice)
 
-        for vizinho in sorted(grafo.get(vertice, set())):
+        for vizinho, peso, id_aresta in sorted(grafo.get(vertice, [])):
             if vizinho not in visitados:
                 fila.append(vizinho)
                 visitados.add(vizinho)
-                id_aresta = grafo[vertice][vizinho] 
                 arvore.append((vertice, vizinho, id_aresta))
 
     return arvore
 
-# função auxiliar
-def find(pai, i):
-    if pai[i] == i:
-        return i
-    return find(pai, pai[i])
 
-# função auxiliar
-def union(pai, rank, x, y):
-    raiz_x = find(pai, x)
-    yroot = find(pai, y)
+# algoritmo de Kruskal para calcular o valor da MST
+def arvore_geradora_minima(grafo, num_vertices):
+    arestas = []
+    for u in grafo:
+        for v, peso, _ in grafo[u]:
+            if u < v:
+                arestas.append((peso, u, v))
+    
+    arestas.sort()
 
-    if rank[raiz_x] < rank[yroot]:
-        pai[raiz_x] = yroot
-    elif rank[raiz_x] > rank[yroot]:
-        pai[yroot] = raiz_x
-    else:
-        pai[yroot] = raiz_x
-        rank[raiz_x] += 1
+    pai = [i for i in range(num_vertices)]
+    rank = [0] * num_vertices
 
-# calcular MST
-def kruskal(grafo):
-    result = [] 
-    i = 0
-    e = 0
+    valor_mst = 0
+    arestas_incluidas = 0
 
-    arestas = [(u, v, peso) for u in grafo for v, peso in grafo[u].items() if v < u]
+    for peso, u, v in arestas:
+        raiz_u = find(pai, u)
+        raiz_v = find(pai, v)
 
-    arestas.sort(key=lambda item: item[2])
+        if raiz_u != raiz_v:
+            valor_mst += peso
+            union(pai, rank, raiz_u, raiz_v)
+            arestas_incluidas += 1
 
-    pai = []
-    rank = []
+        if arestas_incluidas == num_vertices - 1:
+            break
 
-    for node in range(len(grafo)):
-        pai.append(node)
-        rank.append(0)
+    return valor_mst if arestas_incluidas == num_vertices - 1 else -1
 
-    while e < len(grafo) - 1:
-        u, v, w = arestas[i]
-        i = i + 1
-        x = find(pai, u)
-        y = find(pai, v)
-
-        if x != y:
-            e = e + 1
-            result.append([u, v, w])
-            union(pai, rank, x, y)
-
-    peso_total = sum(w for u, v, w in result)
-    return peso_total
-
+# faz a ordenação topologica dos vertices
 def ordenacao_topologica(grafo):
     graus_entrada = {nó: 0 for nó in grafo}
     for nó in grafo:
-        for vizinho in grafo[nó]:
+        for vizinho, _, _ in grafo[nó]:
             graus_entrada[vizinho] = graus_entrada.get(vizinho, 0) + 1
 
     grau_zero = sorted([nó for nó in graus_entrada if graus_entrada[nó] == 0])
@@ -314,7 +343,7 @@ def ordenacao_topologica(grafo):
     while grau_zero:
         nó = grau_zero.pop(0)
         ordem_topologica.append(nó)
-        for vizinho in sorted(grafo.get(nó, {})):
+        for vizinho, _, _ in grafo.get(nó, []):
             graus_entrada[vizinho] -= 1
             if graus_entrada[vizinho] == 0:
                 grau_zero.append(vizinho)
@@ -323,50 +352,135 @@ def ordenacao_topologica(grafo):
     if len(ordem_topologica) == len(graus_entrada):
         return ordem_topologica
     else:
-        return -1 # qdo tem ciclo
+        return -1
 
+# algoritmo de edmonds-karp para calcular o fluxo máximo
+def edmonds_karp(grafo, origem, destino, num_vertices):
+    fluxo_maximo = 0
+    capacidade_residual = {u: {v: peso for v, peso, _ in grafo.get(u, [])} for u in range(num_vertices)}
+
+    while True:
+        fila = deque([origem])
+        pais = {origem: None}
+        while fila:
+            u = fila.popleft()
+            for v, capacidade in capacidade_residual[u].items():
+                if v not in pais and capacidade > 0:
+                    pais[v] = u
+                    if v == destino:
+                        break
+                    fila.append(v)
+            else:
+                continue
+            break
+        else:
+            break
+
+        v = destino
+        capacidade_minima = float('Inf')
+        while v != origem:
+            u = pais[v]
+            capacidade_minima = min(capacidade_minima, capacidade_residual[u][v])
+            v = u
+
+        v = destino
+        while v != origem:
+            u = pais[v]
+            capacidade_residual[u][v] -= capacidade_minima
+            capacidade_residual[v][u] = capacidade_residual.get(v, {}).get(u, 0) + capacidade_minima
+            v = u
+
+        fluxo_maximo += capacidade_minima
+
+    return fluxo_maximo
+
+# calcula o fecho transitivo do vértice 0 em grafos direcionados
+def fecho_transitivo(grafo, origem=0):
+    visitados = set()
+    pilha = [origem]
+
+    while pilha:
+        vertice = pilha.pop()
+        if vertice not in visitados:
+            visitados.add(vertice)
+            for vizinho, _, _ in sorted(grafo.get(vertice, [])):
+                if vizinho not in visitados:
+                    pilha.append(vizinho)
+
+    visitados.discard(origem)  # remove o vértice de origem 0 do conjunto visitados
+    return sorted(visitados)
+
+# função para calcular o caminho mínimo entre 0 e n-1 usando dijkstra
+def caminho_minimo(grafo, num_vertices):
+    dist = {v: float('inf') for v in range(num_vertices)}
+    dist[0] = 0
+    pq = [(0, 0)]
+
+    visitados = set()
+
+    while pq:
+        d, u = heapq.heappop(pq)
+        if u in visitados:
+            continue
+        visitados.add(u)
+        
+        for v, peso, _ in grafo.get(u, []):
+            if v not in visitados and dist[u] + peso < dist[v]:
+                dist[v] = dist[u] + peso
+                heapq.heappush(pq, (dist[v], v))
+
+    return dist[num_vertices - 1] if dist[num_vertices - 1] != float('inf') else -1
 
 def main():
     propriedades_desejadas = list(map(int, input().split()))
     grafo, tipo_grafo, num_vertices = ler_grafo()
 
-    resultados = {}  # para armazenar os resultados e imprimi-los na ordem correta
+    resultados = {}  # para armazenar os resultados e imprimir na ordem correta
 
     for propriedade in propriedades_desejadas:
-        if propriedade == 0: # verificar se o grafo é conexo
-            resultados[propriedade] = 1 if eh_conexo(grafo) else 0
-        elif propriedade == 1: # verificar se um grafo não direcionado é bipartido
-            resultados[propriedade] = 1 if eh_bipartido(grafo) else 0
-        elif propriedade == 2: # verificar se um grafo é euleriano
-            resultados[propriedade] = 1 if eh_euleriano(grafo) else 0
-        elif propriedade == 3: # verificar se um grafo possui ciclo
+        if propriedade == 0:  # verificar se o grafo é conexo
+            resultados[propriedade] = 1 if conexo(grafo, num_vertices) else 0
+        elif propriedade == 1:  # verificar se um grafo não direcionado é bipartido
+            resultados[propriedade] = 1 if bipartido(grafo) else 0
+        elif propriedade == 2:  # verificar se um grafo é euleriano
+            resultados[propriedade] = 1 if euleriano(grafo, num_vertices) else 0
+        elif propriedade == 3:  # verificar se um grafo possui ciclo
             if tipo_grafo == 'nao_direcionado':
                 resultados[propriedade] = 1 if possui_ciclo_nao_direcionado(grafo) else 0
             else:
                 resultados[propriedade] = 1 if possui_ciclo_direcionado(grafo, num_vertices) else 0
-        elif propriedade == 4:  # calcular qtd de componentes conexas em grafo não direcionado
+        elif propriedade == 4:  # calcular quantidade de componentes conexas em grafo não direcionado
             if tipo_grafo == 'nao_direcionado':
                 resultados[propriedade] = num_componentes_conexas(grafo)
             else:
                 resultados[propriedade] = -1
-        elif propriedade == 5: # calcular qtd de componentes fortemente conexas em grafo direcionado
+        elif propriedade == 5:  # calcular quantidade de componentes fortemente conexas em grafo direcionado
             if tipo_grafo == 'direcionado':
                 resultados[propriedade] = componentes_fortemente_conexas(grafo)
             else:
                 resultados[propriedade] = -1
-        elif propriedade == 6: # imprimir vertices de articulação de grafo não direcionado
+        elif propriedade == 6:  # imprimir vertices de articulação de grafo não direcionado
             if tipo_grafo == 'nao_direcionado':
                 articulacoes = vertices_de_articulacao(grafo)
                 if articulacoes:
-                    resultados[propriedade] = " ".join(map(str, articulacoes)) 
+                    resultados[propriedade] = " ".join(map(str, articulacoes))
                 else:
                     resultados[propriedade] = 0
             else:
                 resultados[propriedade] = -1
-        elif propriedade == 7:  # calcular qtd de arestas ponte em grafo não direcionado
+        elif propriedade == 7:  # calcular quantidade de arestas ponte em grafo não direcionado
             if tipo_grafo == 'nao_direcionado':
                 pontes = arestas_ponte(grafo)
                 resultados[propriedade] = len(pontes)
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 8:  # arvore em profundidade
+            if conexo(grafo, num_vertices):
+                arvore_profundidade = dfs_tree(grafo)
+            else:
+                arvore_profundidade = dfs_tree(grafo, origem=0)
+            if arvore_profundidade:
+                resultados[propriedade] = " ".join(map(str, arvore_profundidade))
             else:
                 resultados[propriedade] = -1
         elif propriedade == 9:  # arvore de largura
@@ -377,25 +491,42 @@ def main():
                         map(str, [id_aresta for _, _, id_aresta in arvore_largura])
                     )
                 else:
-                    resultados[propriedade] = 0 
+                    resultados[propriedade] = 0
             else:
                 resultados[propriedade] = -1
-        elif propriedade == 10:  # calcular o valor final da MST para grafos não direcionados
+        elif propriedade == 10:  # calcular valor final da MST
             if tipo_grafo == 'nao_direcionado':
-                resultados[propriedade] = kruskal(grafo)
+                resultados[propriedade] = arvore_geradora_minima(grafo, num_vertices)
             else:
                 resultados[propriedade] = -1
-        elif propriedade == 11:  # calcular o valor final da MST para grafos não direcionados
+        elif propriedade == 11:  # realiza ordenação topologica
             if tipo_grafo == 'nao_direcionado':
                 resultados[propriedade] = -1
             else:
                 resultados[propriedade] = ordenacao_topologica(grafo)
-        else:
-            resultados[propriedade] = -1
+        elif propriedade == 12:  # calcular o valor do caminho mínimo entre os vértices 0 e n-1
+            if tipo_grafo == 'nao_direcionado' and possui_pesos_diferentes(grafo):
+                resultados[propriedade] = caminho_minimo(grafo, num_vertices)
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 13:  # calcular o fluxo máximo
+            if tipo_grafo == 'direcionado':
+                fluxo_maximo = edmonds_karp(grafo, 0, num_vertices - 1, num_vertices)
+                resultados[propriedade] = fluxo_maximo
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 14:  # fecho transitivo do vértice 0
+            if tipo_grafo == 'direcionado':
+                fecho = fecho_transitivo(grafo, origem=0)
+                if fecho:
+                    resultados[propriedade] = " ".join(map(str, fecho))
+                else:
+                    resultados[propriedade] = -1
+            else:
+                resultados[propriedade] = -1
 
     for propriedade in propriedades_desejadas:
         print(resultados[propriedade])
-
 
 if __name__ == "__main__":
     main()
