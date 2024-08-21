@@ -7,10 +7,10 @@ def ler_grafo():
     for _ in range(num_arestas):
         id_aresta, u, v, peso = map(int, input().split())
         if tipo_grafo == 'nao_direcionado':
-            grafo.setdefault(u, set()).add(v)
-            grafo.setdefault(v, set()).add(u)
+            grafo.setdefault(u, {}).update({v: id_aresta})
+            grafo.setdefault(v, {}).update({u: id_aresta})
         else:
-            grafo.setdefault(u, set()).add(v)
+            grafo.setdefault(u, {}).update({v: id_aresta})
 
     return grafo, tipo_grafo, num_vertices
 
@@ -233,6 +233,76 @@ def arestas_ponte(grafo):
 
     return pontes
 
+# verifica a arvore de largura e imprime o identificador das arestas
+def bfs(grafo, origem=0):
+    visitados = set()
+    fila = [origem]
+    arvore = []
+
+    while fila:
+        vertice = fila.pop(0)
+        visitados.add(vertice)
+
+        for vizinho in sorted(grafo.get(vertice, set())):
+            if vizinho not in visitados:
+                fila.append(vizinho)
+                visitados.add(vizinho)
+                id_aresta = grafo[vertice][vizinho] 
+                arvore.append((vertice, vizinho, id_aresta))
+
+    return arvore
+
+# função auxiliar
+def find(pai, i):
+    if pai[i] == i:
+        return i
+    return find(pai, pai[i])
+
+# função auxiliar
+def union(pai, rank, x, y):
+    raiz_x = find(pai, x)
+    yroot = find(pai, y)
+
+    if rank[raiz_x] < rank[yroot]:
+        pai[raiz_x] = yroot
+    elif rank[raiz_x] > rank[yroot]:
+        pai[yroot] = raiz_x
+    else:
+        pai[yroot] = raiz_x
+        rank[raiz_x] += 1
+
+# calcular MST
+def kruskal(grafo):
+    result = [] 
+    i = 0
+    e = 0
+
+    arestas = [(u, v, peso) for u in grafo for v, peso in grafo[u].items() if v < u]
+
+    arestas.sort(key=lambda item: item[2])
+
+    pai = []
+    rank = []
+
+    for node in range(len(grafo)):
+        pai.append(node)
+        rank.append(0)
+
+    while e < len(grafo) - 1:
+        u, v, w = arestas[i]
+        i = i + 1
+        x = find(pai, u)
+        y = find(pai, v)
+
+        if x != y:
+            e = e + 1
+            result.append([u, v, w])
+            union(pai, rank, x, y)
+
+    peso_total = sum(w for u, v, w in result)
+    return peso_total
+
+
 def main():
     propriedades_desejadas = list(map(int, input().split()))
     grafo, tipo_grafo, num_vertices = ler_grafo()
@@ -274,6 +344,22 @@ def main():
             if tipo_grafo == 'nao_direcionado':
                 pontes = arestas_ponte(grafo)
                 resultados[propriedade] = len(pontes)
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 9:  # arvore de largura
+            if 0 in grafo:
+                arvore_largura = bfs(grafo)
+                if arvore_largura:
+                    resultados[propriedade] = " ".join(
+                        map(str, [id_aresta for _, _, id_aresta in arvore_largura])
+                    )
+                else:
+                    resultados[propriedade] = 0 
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 10:  # calcular o valor final da MST para grafos não direcionados
+            if tipo_grafo == 'nao_direcionado':
+                resultados[propriedade] = kruskal(grafo)
             else:
                 resultados[propriedade] = -1
 
