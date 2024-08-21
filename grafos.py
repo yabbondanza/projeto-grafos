@@ -1,41 +1,40 @@
-def ler_grafo(): # leitura do grafo
+# montagem do grafo com a entrada
+def ler_grafo():
     num_vertices, num_arestas = map(int, input().split())
     tipo_grafo = input()
-    grafo = {}  # lista de adjacências
+    grafo = {}
 
     for _ in range(num_arestas):
         id_aresta, u, v, peso = map(int, input().split())
         if tipo_grafo == 'nao_direcionado':
-            grafo.setdefault(u, []).append(v)
-            grafo.setdefault(v, []).append(u)
+            grafo.setdefault(u, set()).add(v)
+            grafo.setdefault(v, set()).add(u)
         else:
-            grafo.setdefault(u, []).append(v)
+            grafo.setdefault(u, set()).add(v)
 
-    return grafo, tipo_grafo
+    return grafo, tipo_grafo, num_vertices
 
-
-# verificação se o grafo é conexo
+# validação se o grafo é conexo
 def eh_conexo(grafo):
     visitados = set()
 
     def dfs(vertice):
         visitados.add(vertice)
-        for vizinho in grafo.get(vertice, []):
+        for vizinho in grafo.get(vertice, set()):
             if vizinho not in visitados:
                 dfs(vizinho)
 
-    dfs(next(iter(grafo)))  
+    dfs(next(iter(grafo)))
 
     return len(visitados) == len(grafo)
 
-
-# verifica se o grafo é bipartido
+# validação se o grafo é bipartido
 def eh_bipartido(grafo):
     cores = {}
 
     def dfs(vertice, cor):
         cores[vertice] = cor
-        for vizinho in grafo.get(vertice, []):
+        for vizinho in grafo.get(vertice, set()):
             if vizinho not in cores:
                 if not dfs(vizinho, 1 - cor):
                     return False
@@ -50,23 +49,23 @@ def eh_bipartido(grafo):
 
     return True
 
-# verifica se o grafo é euleriano
+# validação se o grafo é euleriano
 def eh_euleriano(grafo):
     if not eh_conexo(grafo):
         return False
 
     graus_impares = sum(1 for vertice in grafo if len(grafo[vertice]) % 2 == 1)
 
-    return graus_impares == 0 
+    return graus_impares == 0
 
-# verifica se um grafo nao direcionado possui ciclo
+# validação se o grafo não direcionado possui ciclo
 def possui_ciclo_nao_direcionado(grafo):
     visitados = set()
     parent = {}
 
     def dfs(vertice, pai):
         visitados.add(vertice)
-        for vizinho in grafo.get(vertice, []):
+        for vizinho in grafo.get(vertice, set()):
             if vizinho not in visitados:
                 parent[vizinho] = vertice
                 if dfs(vizinho, vertice):
@@ -82,16 +81,16 @@ def possui_ciclo_nao_direcionado(grafo):
 
     return False
 
-# verifica se um grafo direcionado possui ciclo
-def possui_ciclo_direcionado(grafo):
+# validação se o grafo direcionado possui ciclo
+def possui_ciclo_direcionado(grafo, num_vertices):
     branco, cinza, preto = 0, 1, 2
-    cores = {v: branco for v in grafo}
+    cores = {v: branco for v in range(num_vertices)}
 
     def dfs(vertice):
         cores[vertice] = cinza
-        for vizinho in grafo.get(vertice, []):
+        for vizinho in grafo.get(vertice, set()):
             if cores[vizinho] == cinza:
-                return True 
+                return True
             if cores[vizinho] == branco and dfs(vizinho):
                 return True
         cores[vertice] = preto
@@ -104,14 +103,14 @@ def possui_ciclo_direcionado(grafo):
 
     return False
 
-# calcula numero de componentes conexas
+# calculo da qtd de componentes conexas
 def num_componentes_conexas(grafo):
     visitados = set()
     num_componentes = 0
 
     def dfs(vertice):
         visitados.add(vertice)
-        for vizinho in grafo.get(vertice, []):
+        for vizinho in grafo.get(vertice, set()):
             if vizinho not in visitados:
                 dfs(vizinho)
 
@@ -120,11 +119,12 @@ def num_componentes_conexas(grafo):
             dfs(vertice)
             num_componentes += 1
 
-    return num_componentes if num_componentes > 0 else -1  # Retorna -1
+    return num_componentes if num_componentes > 0 else -1
 
 # calcula numero de componentes fortemente conexas em grafo direcionado usando tarjan
 def componentes_fortemente_conexas(grafo):
-    n = len(grafo)
+    max_vertex_id = max(grafo.keys()) 
+    n = max_vertex_id + 1 
     index = 0
     indices = [-1] * n
     baixos = [-1] * n
@@ -140,7 +140,7 @@ def componentes_fortemente_conexas(grafo):
         pilha.append(v)
         na_pilha[v] = True
 
-        for vizinho in grafo.get(v, []):
+        for vizinho in grafo.get(v, set()):
             if indices[vizinho] == -1:
                 tarjan(vizinho)
                 baixos[v] = min(baixos[v], baixos[vizinho])
@@ -198,10 +198,44 @@ def vertices_de_articulacao(grafo):
 
     return sorted(articulacoes)
 
+# encontra as arestas ponte em grafo nao direcionado
+def arestas_ponte(grafo):
+    n = len(grafo)
+    visitado = [False] * n
+    descoberta = [-1] * n
+    baixo = [-1] * n
+    pai = [-1] * n
+    tempo = 0
+    pontes = []
+
+    def dfs(u):
+        nonlocal tempo
+        filhos = 0
+        visitado[u] = True
+        descoberta[u] = baixo[u] = tempo
+        tempo += 1
+
+        for v in grafo.get(u, []):
+            if not visitado[v]:
+                pai[v] = u
+                filhos += 1
+                dfs(v)
+                baixo[u] = min(baixo[u], baixo[v])
+
+                if baixo[v] > descoberta[u]:
+                    pontes.append((u, v))
+            elif v != pai[u]:
+                baixo[u] = min(baixo[u], descoberta[v])
+
+    for i in grafo:
+        if not visitado[i]:
+            dfs(i)
+
+    return pontes
 
 def main():
     propriedades_desejadas = list(map(int, input().split()))
-    grafo, tipo_grafo = ler_grafo()
+    grafo, tipo_grafo, num_vertices = ler_grafo()
 
     resultados = {}  # para armazenar os resultados e imprimi-los na ordem correta
 
@@ -216,7 +250,7 @@ def main():
             if tipo_grafo == 'nao_direcionado':
                 resultados[propriedade] = 1 if possui_ciclo_nao_direcionado(grafo) else 0
             else:
-                resultados[propriedade] = 1 if possui_ciclo_direcionado(grafo) else 0
+                resultados[propriedade] = 1 if possui_ciclo_direcionado(grafo, num_vertices) else 0
         elif propriedade == 4:  # calcular qtd de componentes conexas em grafo não direcionado
             if tipo_grafo == 'nao_direcionado':
                 resultados[propriedade] = num_componentes_conexas(grafo)
@@ -234,6 +268,12 @@ def main():
                     resultados[propriedade] = " ".join(map(str, articulacoes)) 
                 else:
                     resultados[propriedade] = 0
+            else:
+                resultados[propriedade] = -1
+        elif propriedade == 7:  # calcular qtd de arestas ponte em grafo não direcionado
+            if tipo_grafo == 'nao_direcionado':
+                pontes = arestas_ponte(grafo)
+                resultados[propriedade] = len(pontes)
             else:
                 resultados[propriedade] = -1
 
